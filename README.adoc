@@ -1,0 +1,99 @@
+= PAK Solution
+This is the code for the solution that accompanies the blog post series: TODO add link
+
+== Prerequisites
+You need to have Docker for Desktop installed on your Mac or Windows computer.
+
+== Running the application
+
+. Open a terminal an navigate into this solution folder
+. Run the database and initialize it with:
++
+[source]
+--
+$ docker-compose up init-db
+--
++
+NOTE: If the output is not similar to the above, then the DB initialization may have failed due to a timing error. Just re-run the above command and this time it should succeed.
+
+. Run the API with this command:
++
+[source]
+--
+$ docker-compose up api
+--
+
+. Use `curl` to check the health of the API:
++
+[source]
+--
+$ curl -i --insecure https://localhost:5001/health
+--
++
+The answer should be `true`.
+
+. Create a new order as follows:
++
+[source]
+--
+$ export ORDER_ID=$(curl --insecure --silent -X POST \
+    --header 'Content-Type: application/json' \
+    --data '{"customerId":"e4795b2f-1d8c-4270-bae8-afdd1e048c12", "senderId":"66a04cbd-b9c8-4539-b3b2-e2783df83260"}' \
+    https://localhost:5001/order/create) \
+    && echo $ORDER_ID
+--
++
+The answer should be a `Guid` representing the ID of the new order.
+
+. Add a package to the order as follows:
++
+[source]
+--
+$ data="{\"Id\":${ORDER_ID},\"recipientId\":\"1eabb102-38e0-48ad-a76b-fada000038df\"}" \
+    && export PACKAGE_ID=$(curl --insecure --silent -X POST \
+    --header 'Content-Type: application/json' \
+    --data ${data} \
+    https://localhost:5001/order/addPackage) \
+    && echo $PACKAGE_ID
+--
+
+. Set the delivery window for the above package with:
++
+[source]
+--
+$ data="{\"Id\":${PACKAGE_ID},\"StartingFrom\":\"2020-03-31T12:00Z\",\"TimeWindowInHours\":4}" \
+    && curl --insecure --silent -X POST \
+    --header 'Content-Type: application/json' \
+    --data ${data} \
+    https://localhost:5001/package/setDeliveryWindow
+--
++
+WARNING: Make sure the value of your `StartingFrom` property is at least *tomorrow* relative to the current date!
+
+. Submit the order with:
++
+[source]
+--
+$ curl --insecure --silent -X POST \
+    --header 'Content-Type: application/json' \
+    --data "{\"Id\":${ORDER_ID}}" \
+    https://localhost:5001/order/submit
+--
+
+. Similar to cancel the order use:
++
+[source]
+--
+$ curl --insecure --silent -X POST \
+    --header 'Content-Type: application/json' \
+    --data "{\"Id\":${ORDER_ID}}" \
+    https://localhost:5001/order/cancel
+--
+
+== Cleanup
+To cleanup the application use:
+
+[source]
+--
+$ docker-compose down -v
+--

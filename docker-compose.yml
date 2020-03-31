@@ -1,0 +1,43 @@
+version: "2.4"
+services:
+  db:
+    image: custom-sql-server:dev
+    build: Database
+    ports:
+      - 1433:1433
+    environment: 
+      ACCEPT_EULA: Y
+      SA_PASSWORD: Top-Secret
+      MSSQL_PID: Developer
+    healthcheck:
+      test: nc -z localhost 1433 || exit -1
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+      
+  init-db:
+    image: mcr.microsoft.com/mssql/server:2019-latest
+    volumes:
+      - ./Database:/app
+    command: /opt/mssql-tools/bin/sqlcmd -S db -U sa -P Top-Secret -d master -i /app/setup.sql
+    depends_on: 
+      db:
+        condition: service_healthy
+      
+  api:
+    image: api:dev
+    build:
+      context: .
+      dockerfile: OrderApi/Dockerfile
+    ports:
+      - 5000:5000
+      - 5001:5001
+    environment:
+      ASPNETCORE_URLS: https://*:5001;http://*:5000
+      # note the double underscore '__' because ':' is not allowed in env variable names
+      ConnectionStrings__EVENT_STORE_DB: "Data Source=db;database=eventstore;User Id=sa;Password=Top-Secret;"
+      ConnectionStrings__PROJECTIONS_DB: "Data Source=db;database=projections;User Id=sa;Password=Top-Secret;"
+    depends_on: 
+      db:
+        condition: service_healthy
